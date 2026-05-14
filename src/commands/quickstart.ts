@@ -36,7 +36,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const inbox = result.inbox;
 
   // Set up watch only if plan supports it
-  const canWatch = hasPlan(user.plan ?? "free", "growth");
+  const canWatch = hasPlan(user.plan ?? "free", "startup");
   if (canWatch) {
     const count = await countActiveWatches(discordId);
     if (count < 5) {

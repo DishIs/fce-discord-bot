@@ -90,8 +90,8 @@ The bot mirrors the [fce-cli](https://github.com/DishIs/fce-cli) experience exac
 | Command | Description | Plan |
 |---|---|---|
 | `/otp <inbox>` | Get the latest OTP code | Developer+ |
-| `/watch start <inbox>` | Real-time email alerts in this channel | Growth+ |
-| `/watch stop <inbox>` | Stop watching | Growth+ |
+| `/watch start <inbox>` | Real-time email alerts in this channel | Startup+ |
+| `/watch stop <inbox>` | Stop watching | Startup+ |
 | `/watch list` | Active watches | Any |
 | `/timeline <inbox>` | Email delivery event timeline | Growth+ |
 | `/insights <inbox>` | Delivery health and failure analysis | Growth+ |

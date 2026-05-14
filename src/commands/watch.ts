@@ -56,8 +56,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const inbox = interaction.options.getString("inbox", true);
 
-  // Growth plan required for WebSocket watch (same as fce-cli)
-  const ok = await requirePlan(interaction, user.plan ?? "free", "growth", "Real-time watch", locale);
+  // Startup plan required for WebSocket watch (WS_PLANS = startup, growth, enterprise)
+  const ok = await requirePlan(interaction, user.plan ?? "free", "startup", "Real-time watch", locale);
   if (!ok) return;
 
   if (sub === "start") {
