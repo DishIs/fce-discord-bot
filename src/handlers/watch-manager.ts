@@ -4,8 +4,9 @@ import { getAllActiveWatches, removeWatch } from "../lib/store.js";
 import { watchAlertEmbed } from "../lib/embed.js";
 import { t } from "../i18n/index.js";
 
-const WS_BASE = process.env.FCE_WS_BASE ?? "wss://api2.freecustom.email/v1";
+const WS_BASE = process.env.FCE_WS_BASE ?? "wss://api2.freecustom.email/v1/ws";
 const RECONNECT_DELAY = 5_000;
+const PING_INTERVAL   = 25_000;
 
 interface WatchEntry {
   discordId: string;
@@ -33,19 +34,29 @@ async function openConnection(entry: WatchEntry): Promise<void> {
   const key = connKey(entry.apiKey, entry.inbox);
   if (connections.has(key)) return;
 
-  const url = `${WS_BASE}/inboxes/${encodeURIComponent(entry.inbox)}/stream`;
+  const url = `${WS_BASE}?api_key=${encodeURIComponent(entry.apiKey)}&mailbox=${encodeURIComponent(entry.inbox)}`;
 
   function connect(retries = 0) {
-    const ws = new WebSocket(url, {
-      headers: { Authorization: `Bearer ${entry.apiKey}` },
-    });
+    const ws = new WebSocket(url);
 
     const conn: WsConn = { ws, active: true, retries };
     connections.set(key, conn);
 
+    // Keep-alive ping every 25 s (matches fce-cli behaviour)
+    const pingTimer = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      }
+    }, PING_INTERVAL);
+
     ws.on("message", async (raw) => {
       try {
-        const msg = JSON.parse(raw.toString());
+        const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
+        if (msg.type === "connected" || msg.type === "pong") return;
+        if (msg.type === "error") {
+          console.error("[ws] server error", msg.code, msg.message);
+          return;
+        }
         await deliverEmail(entry, msg);
       } catch (err) {
         console.error("[ws] parse error", err);
@@ -53,6 +64,7 @@ async function openConnection(entry: WatchEntry): Promise<void> {
     });
 
     ws.on("close", () => {
+      clearInterval(pingTimer);
       if (!conn.active) return;
       const delay = Math.min(RECONNECT_DELAY * 2 ** retries, 60_000);
       setTimeout(() => connect(retries + 1), delay);
@@ -75,9 +87,9 @@ async function deliverEmail(entry: WatchEntry, msg: Record<string, unknown>) {
       inbox:             entry.inbox,
       from:              String(msg.from ?? ""),
       subject:           String(msg.subject ?? "(no subject)"),
-      otp:               msg.otp ? String(msg.otp) : undefined,
-      verification_link: msg.verification_link ? String(msg.verification_link) : undefined,
-      timestamp:         msg.timestamp ? Number(msg.timestamp) : undefined,
+      otp:               msg.otp && String(msg.otp) !== "null" && String(msg.otp) !== "__DETECTED__" && String(msg.otp) !== "__UPGRADE_REQUIRED__" ? String(msg.otp) : undefined,
+      verification_link: msg.verificationLink ? String(msg.verificationLink) : undefined,
+      timestamp:         msg.date ? new Date(String(msg.date)).getTime() : undefined,
     });
 
     await (channel as TextChannel).send({ embeds: [embed] });
@@ -87,7 +99,7 @@ async function deliverEmail(entry: WatchEntry, msg: Record<string, unknown>) {
     // Try DM fallback
     try {
       const user    = await discordClient.users.fetch(entry.discordId);
-      const embed   = watchAlertEmbed({
+      const embed = watchAlertEmbed({
         inbox:   entry.inbox,
         from:    String(msg.from ?? ""),
         subject: String(msg.subject ?? "(no subject)"),
