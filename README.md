@@ -18,7 +18,7 @@
   <br />
 
   <p>
-    <a href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=2147502080"><strong>→ Add to Server</strong></a>
+    <a href="https://discord.com/oauth2/authorize?client_id=1504547278679969812"><strong>→ Add to Server</strong></a>
     &nbsp;&nbsp;·&nbsp;&nbsp;
     <a href="https://www.freecustom.email/api/discord"><strong>Bot Page</strong></a>
     &nbsp;&nbsp;·&nbsp;&nbsp;
