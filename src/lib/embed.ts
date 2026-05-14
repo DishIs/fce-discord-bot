@@ -259,11 +259,11 @@ export function plansEmbed(currentPlan: string): {
     .setTitle("API Plans")
     .setDescription(`Your current plan: \`${currentPlan}\`\n\nChoose a plan that fits your usage.`)
     .addFields(
-      { name: "Free · $0",         value: "1k req/mo · 10 inboxes · Shared pool",           inline: false },
-      { name: "Developer · $10/mo", value: "50k req/mo · 25 inboxes · Wait API · OTP",       inline: false },
-      { name: "Startup · $29/mo",   value: "250k req/mo · 40 inboxes · WebSocket watch",     inline: false },
-      { name: "Growth · $89/mo ⭐", value: "1M req/mo · 100 inboxes · Custom domains · MCP · Webhooks", inline: false },
-      { name: "Enterprise · $199/mo", value: "10M req/mo · Unlimited inboxes · 99.5% SLA",  inline: false },
+      { name: "Free · $0",           value: "1k req/mo · 10 inboxes · Shared pool",                              inline: false },
+      { name: "Developer · $10/mo",  value: "50k req/mo · 25 inboxes · Wait API · OTP",                          inline: false },
+      { name: "Startup · $29/mo",    value: "250k req/mo · 40 inboxes",                                           inline: false },
+      { name: "Growth · $89/mo ⭐",  value: "1M req/mo · 100 inboxes · WebSocket watch · Custom domains · MCP",  inline: false },
+      { name: "Enterprise · $199/mo", value: "10M req/mo · Unlimited inboxes · 99.5% SLA",                       inline: false },
     );
 
   const plans = ["developer", "startup", "growth", "enterprise"];
@@ -427,7 +427,7 @@ export function helpEmbed(): EmbedBuilder {
         name: "⚡ Power Features",
         value: [
           "`/otp <inbox>`  — Latest OTP  *(Growth+)*",
-          "`/watch <inbox>`  — Real-time email alerts  *(Startup+)*",
+          "`/watch <inbox>`  — Real-time email alerts  *(Growth+)*",
           "`/unwatch <inbox>`  — Stop watching",
           "`/timeline <inbox>`  — Event timeline  *(Growth+)*",
           "`/insights <inbox>`  — Delivery insights  *(Growth+)*",
@@ -506,12 +506,12 @@ export function quickstartEmbed(inbox: string, hasWatch: boolean): {
     .addFields({ name: "Your address", value: `\`${inbox}\`` });
 
   if (!hasWatch) {
-    embed.addFields({ name: "Real-time watch", value: "Requires Startup plan.\n→ `/messages` to check manually." });
+    embed.addFields({ name: "Real-time watch", value: "Requires Growth plan.\n→ `/messages` to check manually." });
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setLabel("Upgrade to Startup")
+        .setLabel("Upgrade to Growth")
         .setStyle(ButtonStyle.Link)
-        .setURL(`${FCE_SITE}/api/pricing?plan=startup&utm_source=discord_quickstart`)
+        .setURL(`${FCE_SITE}/api/pricing?plan=growth&utm_source=discord_quickstart`)
     );
     return { embed, row };
   }
