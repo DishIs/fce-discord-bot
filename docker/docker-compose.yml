@@ -1,0 +1,39 @@
+# Drop this block into your existing docker-compose.yml on the server.
+# It reuses your existing postgres + redis services.
+
+version: "3.9"
+
+services:
+  fce-discord-bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: always
+    env_file: ../.env
+    ports:
+      - "127.0.0.1:4242:4242"   # nginx proxies bot.freecustom.email → this
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - fce-internal
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# nginx snippet for bot.freecustom.email:
+# server {
+#   listen 443 ssl;
+#   server_name bot.freecustom.email;
+#   location / {
+#     proxy_pass http://127.0.0.1:4242;
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#   }
+# }
+
+networks:
+  fce-internal:
+    external: true   # must match your existing network name

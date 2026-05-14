@@ -1,0 +1,163 @@
+{
+  "login": {
+    "title": "Connect your FreeCustom.Email account",
+    "desc": "Click the button below to open the login page.\nThis link expires in **3 minutes**.\n\nAfter logging in, return here — the bot updates automatically.",
+    "btn": "Login with FreeCustom.Email",
+    "already": "You're already logged in.",
+    "already_hint": "Run `/logout` first to switch accounts.",
+    "success": "✓ Logged in successfully!",
+    "success_hint": "Run `/status` to see your account.",
+    "timeout": "✗ Login timed out. Run `/login` again.",
+    "failed": "✗ Authentication failed. Run `/login` again."
+  },
+  "logout": {
+    "success": "✓ Logged out. Your credentials have been removed.",
+    "not_logged_in": "You're not logged in. Nothing to remove."
+  },
+  "status": {
+    "title": "Account",
+    "plan": "Plan",
+    "price": "Price",
+    "credits": "Credits",
+    "api_inboxes": "API inboxes",
+    "app_inboxes": "App inboxes"
+  },
+  "usage": {
+    "title": "Request Usage",
+    "used": "Used",
+    "remaining": "Remaining",
+    "percent": "Percent used",
+    "credits": "Credits remaining",
+    "resets": "Resets approx",
+    "warn_80": "· Usage above 80% — consider topping up.",
+    "btn_credits": "Add credits",
+    "btn_upgrade": "Upgrade plan"
+  },
+  "inbox": {
+    "list_title": "Your Inboxes",
+    "none": "No inboxes registered yet.\nUse `/inbox add` or `/quickstart` to create one.",
+    "added": "✓ Inbox registered",
+    "removed": "✓ Inbox removed",
+    "confirm_remove": "Remove **{inbox}**? This cannot be undone.",
+    "confirm_yes": "Remove",
+    "confirm_no": "Cancel",
+    "cancelled": "Cancelled."
+  },
+  "messages": {
+    "title": "Messages in {inbox}",
+    "none": "No messages yet.\nEmails sent to this address will appear here.",
+    "hint": "Use `/read {inbox} {id}` to open a message.",
+    "otp_chip": "OTP",
+    "link_chip": "Verify link detected"
+  },
+  "read": {
+    "title": "Message",
+    "from": "From",
+    "subject": "Subject",
+    "date": "Date",
+    "otp": "OTP",
+    "verify": "Verify link",
+    "body": "Body"
+  },
+  "otp": {
+    "title": "OTP",
+    "otp": "Code",
+    "from": "From",
+    "subject": "Subject",
+    "time": "Received",
+    "link": "Verify link",
+    "none": "No OTP found in recent messages."
+  },
+  "domains": {
+    "title": "Available Domains",
+    "none": "No domains available on your plan.",
+    "fresh": "fresh",
+    "pro": "pro"
+  },
+  "watch": {
+    "started": "✓ Watching **{inbox}**\nEmails will appear in {channel}.",
+    "already": "Already watching **{inbox}**.",
+    "stopped": "✓ Stopped watching **{inbox}**.",
+    "not_watching": "You're not watching **{inbox}**.",
+    "list_title": "Active Watches",
+    "list_none": "No active watches. Use `/watch <inbox>` to start.",
+    "limit": "Maximum 5 active watches per account.",
+    "email_title": "📬 New email",
+    "email_fallback": "⚠ Couldn't post to {channel}. Here it is instead:"
+  },
+  "plans": {
+    "title": "API Plans",
+    "subtitle": "Choose the plan that fits your usage.",
+    "current": "Current plan",
+    "upgrade_btn": "Upgrade to {plan}",
+    "your_plan": "Your plan: **{plan}**"
+  },
+  "feedback": {
+    "prompt_title": "Quick rating?",
+    "prompt_desc": "You've been using the FCE bot a while — mind leaving a 5-second rating? It really helps.",
+    "stars_label": "How would you rate the bot?",
+    "comment_label": "Anything to add? (optional)",
+    "comment_placeholder": "Works great! / Could use X feature...",
+    "thanks": "✓ Thanks! Your feedback means a lot.",
+    "skip": "Skip",
+    "skipped": "No worries — you won't be asked again."
+  },
+  "support": {
+    "sent": "✓ Support ticket submitted. We'll reply to your Discord DM.",
+    "failed": "✗ Couldn't submit — try emailing support@freecustom.email directly.",
+    "label_user": "Discord user",
+    "label_plan": "Plan",
+    "label_commands": "Commands run",
+    "label_message": "Message"
+  },
+  "errors": {
+    "not_logged_in": "✗ Not logged in.\nRun `/login` to connect your account.",
+    "plan_gate": "⚡ **{plan} plan required**\n{feature} is available on {plan} and above.\n\n→ See plans",
+    "rate_limit": "✗ Rate limit hit.\n{usage}\n→ Add credits or upgrade to continue.",
+    "api_error": "✗ API error: {message}",
+    "unknown": "✗ Something went wrong. Try again or run `/support`."
+  },
+  "quickstart": {
+    "title": "✓ Inbox ready",
+    "watching": "Watching for emails in real-time.",
+    "address": "Your address",
+    "hint": "Send an email to this address and it will appear here instantly.",
+    "no_ws": "Real-time watch needs Startup plan.\nEmails are still accessible via `/messages {inbox}`.",
+    "upgrade_hint": "→ Upgrade for WebSocket watch"
+  },
+  "guide": {
+    "step1_title": "Step 1 — Login",
+    "step1_desc": "First, connect your FreeCustom.Email account.",
+    "step1_btn": "Run /login",
+    "step2_title": "Step 2 — Create an inbox",
+    "step2_desc": "Register a disposable email address.",
+    "step2_btn": "Run /inbox add",
+    "step3_title": "Step 3 — Watch for emails",
+    "step3_desc": "Get notified instantly when emails arrive.",
+    "step3_btn": "Run /watch",
+    "step4_title": "Step 4 — Extract OTPs",
+    "step4_desc": "One-time codes are detected and shown automatically.",
+    "step4_btn": "Run /otp",
+    "done_title": "You're all set!",
+    "done_desc": "Run `/help` anytime to see all commands."
+  },
+  "help": {
+    "title": "FreeCustom.Email Bot",
+    "subtitle": "Disposable inboxes, OTP extraction, and real-time email — in Discord.",
+    "section_start": "🚀 Getting Started",
+    "section_inbox": "📬 Inbox",
+    "section_power": "⚡ Power Features",
+    "section_billing": "💳 Plans & Billing",
+    "section_support": "🛟 Help & Support",
+    "footer": "freecustom.email · /guide for step-by-step onboarding"
+  },
+  "timeline": {
+    "title": "Timeline — {inbox}",
+    "none": "No events found.",
+    "latency": "+{ms}ms"
+  },
+  "insights": {
+    "title": "Insights — {inbox}",
+    "none": "No issues detected. Delivery looks healthy."
+  }
+}

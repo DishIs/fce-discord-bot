@@ -1,0 +1,41 @@
+import {
+  ChatInputCommandInteraction,
+  SlashCommandBuilder,
+  MessageFlags,
+} from "discord.js";
+import { getUserApiKey } from "../lib/store.js";
+import { FceApi } from "../lib/api.js";
+import { messageEmbed } from "../lib/embed.js";
+import { withApiError } from "../lib/upsell.js";
+import { t } from "../i18n/index.js";
+
+export const data = new SlashCommandBuilder()
+  .setName("read")
+  .setDescription("Open a specific email message")
+  .addStringOption((o) =>
+    o.setName("inbox").setDescription("Email address").setRequired(true)
+  )
+  .addStringOption((o) =>
+    o.setName("id").setDescription("Message ID").setRequired(true)
+  );
+
+export async function execute(interaction: ChatInputCommandInteraction) {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  const locale    = interaction.locale;
+  const discordId = interaction.user.id;
+  const apiKey    = await getUserApiKey(discordId);
+
+  if (!apiKey) {
+    await interaction.editReply({ content: t(locale, "errors.not_logged_in") });
+    return;
+  }
+
+  const inbox = interaction.options.getString("inbox", true);
+  const id    = interaction.options.getString("id", true);
+  const api   = new FceApi(apiKey);
+  const msg   = await withApiError(interaction, locale, () => api.getMessage(inbox, id));
+  if (!msg) return;
+
+  await interaction.editReply({ embeds: [messageEmbed(msg)] });
+}
