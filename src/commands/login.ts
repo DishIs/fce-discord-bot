@@ -28,7 +28,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const state      = await createLoginState(discordId);
   const authBase   = process.env.FCE_CLI_AUTH_URL ?? "https://www.freecustom.email/api/cli-auth";
   const callbackBase = process.env.CALLBACK_BASE_URL ?? "https://bot.freecustom.email";
-  const authUrl    = `${authBase}?callback=${encodeURIComponent(`${callbackBase}/auth/callback`)}&state=${state}&source=discord`;
+  // state is embedded inside the callback URL so the auth page forwards it automatically
+  const callbackUrl = `${callbackBase}/auth/callback?state=${state}`;
+  const authUrl     = `${authBase}?callback=${encodeURIComponent(callbackUrl)}&source=discord`;
 
   const { embed, row } = loginEmbed(authUrl);
   await interaction.editReply({ embeds: [embed], components: [row] });
