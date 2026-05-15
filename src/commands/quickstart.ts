@@ -44,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const channelId = interaction.channelId;
       const guildId   = interaction.guildId ?? undefined;
       await addWatch(discordId, inbox, channelId, guildId);
-      await startWatch(discordId, inbox, channelId, user.apiKey, user.locale ?? "en-US");
+      await startWatch(discordId, inbox, channelId, guildId ?? null, user.apiKey, user.locale ?? "en-US");
     }
   }
 

@@ -8,7 +8,9 @@ import { FceApi } from "../lib/api.js";
 import { messageEmbed } from "../lib/embed.js";
 import { withApiError } from "../lib/upsell.js";
 import { t } from "../i18n/index.js";
-import { isOutputEphemeral } from "../lib/reply-mode.js";
+import { isOutputEphemeral, createViewToken } from "../lib/reply-mode.js";
+
+const CALLBACK_BASE = process.env.CALLBACK_BASE_URL ?? "http://localhost:4242";
 
 export const data = new SlashCommandBuilder()
   .setName("read")
@@ -35,8 +37,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const inbox = interaction.options.getString("inbox", true);
   const id    = interaction.options.getString("id", true);
   const api   = new FceApi(apiKey);
-  const msg   = await withApiError(interaction, locale, () => api.getMessage(inbox, id));
+  const msg   = await withApiError(interaction, locale, () => api.getMessage(inbox, id), { inbox });
   if (!msg) return;
 
-  await interaction.editReply({ embeds: [messageEmbed(msg)] });
+  const token  = await createViewToken({ inbox, messageId: id, apiKey });
+  const viewUrl = `${CALLBACK_BASE}/view/${token}`;
+
+  const { embed, row } = messageEmbed(msg, viewUrl);
+  await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
 }

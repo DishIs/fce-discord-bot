@@ -83,7 +83,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     await addWatch(discordId, inbox, channelId, guildId);
-    await startWatch(discordId, inbox, channelId, user.apiKey, user.locale ?? "en-US");
+    await startWatch(discordId, inbox, channelId, guildId ?? null, user.apiKey, user.locale ?? "en-US");
 
     await interaction.editReply({
       content: t(locale, "watch.started", { inbox, channel: `<#${channelId}>` }),

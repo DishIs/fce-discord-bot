@@ -31,7 +31,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const inbox    = interaction.options.getString("inbox", true);
   const api      = new FceApi(apiKey);
-  const insights = await withApiError(interaction, locale, () => api.getInsights(inbox));
+  const insights = await withApiError(interaction, locale, () => api.getInsights(inbox), { inbox });
   if (!insights) return;
 
   await interaction.editReply({ embeds: [insightsEmbed(inbox, insights)] });

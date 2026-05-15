@@ -33,7 +33,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const inbox = interaction.options.getString("inbox", true);
   const api   = new FceApi(user.apiKey);
-  const data  = await withApiError(interaction, locale, () => api.getOtp(inbox));
+  const data  = await withApiError(interaction, locale, () => api.getOtp(inbox), { inbox });
   if (!data) return;
 
   if (!data.otp) {

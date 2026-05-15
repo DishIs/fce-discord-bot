@@ -123,7 +123,125 @@ export function startAuthServer(client: Client): void {
     }
   });
 
+  // GET /view/:token — render a full HTML email in the browser
+  app.get("/view/:token", async (req, res) => {
+    const { token } = req.params;
+
+    try {
+      const { getViewToken } = await import("../lib/reply-mode.js");
+      const data = await getViewToken(token);
+
+      if (!data) {
+        res.status(410).send(viewErrorPage("Link expired", "This email preview link has expired (valid for 24 hours).<br>Open the message again from Discord to get a fresh link."));
+        return;
+      }
+
+      const apiBase = process.env.FCE_API_BASE ?? "https://api2.freecustom.email/v1";
+      const apiRes  = await fetch(`${apiBase}/inboxes/${encodeURIComponent(data.inbox)}/messages/${encodeURIComponent(data.messageId)}`, {
+        headers: { Authorization: `Bearer ${data.apiKey}`, "User-Agent": "fce-discord-bot/1.0.0" },
+      });
+
+      if (!apiRes.ok) {
+        res.status(404).send(viewErrorPage("Message not found", "This email may have been deleted."));
+        return;
+      }
+
+      const json = await apiRes.json() as Record<string, unknown>;
+      const msg  = (json.data ?? json) as {
+        from?: string; subject?: string; date?: string;
+        body_html?: string; body_text?: string;
+        otp?: string; verification_link?: string;
+      };
+
+      res.status(200).send(renderEmailPage(msg));
+    } catch (err) {
+      console.error("[view]", err);
+      res.status(500).send(viewErrorPage("Error", "Could not load email. Try again."));
+    }
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[auth] Callback server listening on :${PORT}`);
   });
+}
+
+function renderEmailPage(msg: {
+  from?: string; subject?: string; date?: string;
+  body_html?: string; body_text?: string;
+  otp?: string; verification_link?: string;
+}): string {
+  const subject  = esc(msg.subject ?? "(no subject)");
+  const from     = esc(msg.from ?? "");
+  const date     = msg.date ? new Date(msg.date).toLocaleString() : "";
+  const otp      = msg.otp && msg.otp !== "__DETECTED__" && msg.otp !== "__UPGRADE_REQUIRED__" ? esc(msg.otp) : "";
+  const verifyLink = msg.verification_link ?? "";
+  const bodyHtml = msg.body_html ?? "";
+  const bodyText = msg.body_text ?? "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${subject} — FreeCustom.Email</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d0d0d; color: #e5e5e5; min-height: 100vh; padding: 0; }
+    .header { background: #111; border-bottom: 1px solid #222; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+    .logo { font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -0.3px; }
+    .logo span { color: #22c55e; }
+    .meta { max-width: 760px; margin: 24px auto; padding: 0 24px; }
+    .meta-card { background: #141414; border: 1px solid #222; border-radius: 10px; padding: 20px 24px; }
+    .subject { font-size: 20px; font-weight: 600; line-height: 1.3; margin-bottom: 16px; }
+    .row { display: flex; gap: 8px; font-size: 13px; color: #999; margin-bottom: 6px; }
+    .row strong { color: #e5e5e5; min-width: 60px; }
+    .badges { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .otp-badge { background: #052e16; border: 1px solid #166534; color: #22c55e; padding: 8px 16px; border-radius: 8px; font-family: monospace; font-size: 22px; font-weight: 700; letter-spacing: 4px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; text-decoration: none; border: 1px solid #333; color: #e5e5e5; background: #1a1a1a; cursor: pointer; }
+    .btn:hover { background: #222; }
+    .btn-primary { background: #16a34a; border-color: #16a34a; color: #fff; }
+    .btn-primary:hover { background: #15803d; }
+    .body-wrap { max-width: 760px; margin: 0 auto 40px; padding: 0 24px; }
+    .body-card { background: #fff; color: #111; border-radius: 10px; overflow: hidden; }
+    .body-plain { background: #141414; color: #e5e5e5; border: 1px solid #222; border-radius: 10px; padding: 24px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+    iframe { width: 100%; border: none; display: block; min-height: 400px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Free<span>Custom</span>.Email</div>
+  </div>
+
+  <div class="meta">
+    <div class="meta-card">
+      <div class="subject">${subject}</div>
+      <div class="row"><strong>From</strong> <span>${from}</span></div>
+      <div class="row"><strong>Date</strong> <span>${date}</span></div>
+      ${otp ? `<div class="badges"><div class="otp-badge">${otp}</div></div>` : ""}
+      ${verifyLink ? `<div class="badges"><a class="btn btn-primary" href="${esc(verifyLink)}" target="_blank" rel="noopener">✓ Verify account</a></div>` : ""}
+    </div>
+  </div>
+
+  <div class="body-wrap">
+    ${bodyHtml
+      ? `<div class="body-card"><iframe srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin" onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe></div>`
+      : bodyText
+        ? `<div class="body-plain">${esc(bodyText)}</div>`
+        : `<div class="body-plain" style="color:#666;font-style:italic">No message body.</div>`
+    }
+  </div>
+</body>
+</html>`;
+}
+
+function viewErrorPage(title: string, body: string): string {
+  return `<!DOCTYPE html><html><head><title>${title}</title><meta charset="utf-8">
+  <style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0d0d0d;color:#e5e5e5;}
+  .box{text-align:center;max-width:400px;padding:2rem;}h1{color:#ef4444;margin-bottom:.75rem;}</style></head>
+  <body><div class="box"><h1>${title}</h1><p>${body}</p></div></body></html>`;
+}
+
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

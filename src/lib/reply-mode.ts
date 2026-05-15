@@ -1,5 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { prisma, redis } from "./store.js";
+import { randomUUID } from "crypto";
 
 // ── Output mode ───────────────────────────────────────────────────────────────
 // In DMs  : per-user setting (publicOutput on User)
@@ -45,4 +46,26 @@ export function trackBotMessage(channelId: string, messageId: string): void {
 
 export async function getLastBotMessage(channelId: string): Promise<string | null> {
   return redis.get(`bot:pin:${channelId}`).catch(() => null);
+}
+
+// ── Email view tokens (for browser view links) ────────────────────────────────
+
+export interface ViewTokenData {
+  inbox:     string;
+  messageId: string;
+  apiKey:    string;
+}
+
+const VIEW_TTL = 86400; // 24 hours
+
+export async function createViewToken(data: ViewTokenData): Promise<string> {
+  const token = randomUUID();
+  await redis.setex(`view:${token}`, VIEW_TTL, JSON.stringify(data));
+  return token;
+}
+
+export async function getViewToken(token: string): Promise<ViewTokenData | null> {
+  const raw = await redis.get(`view:${token}`).catch(() => null);
+  if (!raw) return null;
+  return JSON.parse(raw) as ViewTokenData;
 }

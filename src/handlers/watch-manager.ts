@@ -2,9 +2,11 @@ import WebSocket from "ws";
 import { Client, TextChannel } from "discord.js";
 import { getAllActiveWatches, removeWatch } from "../lib/store.js";
 import { watchAlertEmbed } from "../lib/embed.js";
+import { isOutputEphemeral, createViewToken } from "../lib/reply-mode.js";
 import { t } from "../i18n/index.js";
 
-const WS_BASE = process.env.FCE_WS_BASE ?? "wss://api2.freecustom.email/v1/ws";
+const WS_BASE         = process.env.FCE_WS_BASE     ?? "wss://api2.freecustom.email/v1/ws";
+const CALLBACK_BASE   = process.env.CALLBACK_BASE_URL ?? "http://localhost:4242";
 const RECONNECT_DELAY = 5_000;
 const PING_INTERVAL   = 25_000;
 
@@ -12,11 +14,11 @@ interface WatchEntry {
   discordId: string;
   inbox:     string;
   channelId: string;
+  guildId:   string | null;
   apiKey:    string;
   locale:    string;
 }
 
-// One WebSocket per (apiKey, inbox) pair
 interface WsConn {
   ws:      WebSocket;
   active:  boolean;
@@ -38,15 +40,11 @@ async function openConnection(entry: WatchEntry): Promise<void> {
 
   function connect(retries = 0) {
     const ws = new WebSocket(url);
-
     const conn: WsConn = { ws, active: true, retries };
     connections.set(key, conn);
 
-    // Keep-alive ping every 25 s (matches fce-cli behaviour)
     const pingTimer = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
-      }
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ping" }));
     }, PING_INTERVAL);
 
     ws.on("message", async (raw) => {
@@ -79,38 +77,64 @@ async function openConnection(entry: WatchEntry): Promise<void> {
 }
 
 async function deliverEmail(entry: WatchEntry, msg: Record<string, unknown>) {
+  const otp = (() => {
+    const v = msg.otp ? String(msg.otp) : undefined;
+    if (!v || v === "null" || v === "__DETECTED__" || v === "__UPGRADE_REQUIRED__") return undefined;
+    return v;
+  })();
+
+  // Generate a view token so the alert has an "Open email" button
+  const messageId = msg.id ? String(msg.id) : undefined;
+  let viewUrl: string | undefined;
+  if (messageId) {
+    try {
+      const token = await createViewToken({ inbox: entry.inbox, messageId, apiKey: entry.apiKey });
+      viewUrl = `${CALLBACK_BASE}/view/${token}`;
+    } catch { /* non-fatal */ }
+  }
+
+  const alertData = {
+    inbox:             entry.inbox,
+    from:              String(msg.from ?? ""),
+    subject:           String(msg.subject ?? "(no subject)"),
+    otp,
+    verification_link: msg.verificationLink ? String(msg.verificationLink) : undefined,
+    timestamp:         msg.date ? new Date(String(msg.date)).getTime() : undefined,
+    viewUrl,
+  };
+
+  // Check output mode: if the guild is in private mode, DM the user instead of channel post
+  const isPrivate = await isOutputEphemeral(entry.discordId, entry.guildId).catch(() => false);
+
+  if (isPrivate) {
+    try {
+      const dmUser = await discordClient.users.fetch(entry.discordId);
+      const { embed, row } = watchAlertEmbed(alertData);
+      const note = entry.guildId
+        ? `> *Private mode is on for this server — alerts go to your DM.*`
+        : "";
+      await dmUser.send({ content: note || undefined, embeds: [embed], components: row ? [row] : [] });
+    } catch (err) {
+      console.error("[ws] DM delivery failed", err);
+    }
+    return;
+  }
+
+  // Public mode — post to the configured channel
   try {
     const channel = await discordClient.channels.fetch(entry.channelId);
     if (!channel?.isTextBased()) throw new Error("not text channel");
-
-    const embed = watchAlertEmbed({
-      inbox:             entry.inbox,
-      from:              String(msg.from ?? ""),
-      subject:           String(msg.subject ?? "(no subject)"),
-      otp:               msg.otp && String(msg.otp) !== "null" && String(msg.otp) !== "__DETECTED__" && String(msg.otp) !== "__UPGRADE_REQUIRED__" ? String(msg.otp) : undefined,
-      verification_link: msg.verificationLink ? String(msg.verificationLink) : undefined,
-      timestamp:         msg.date ? new Date(String(msg.date)).getTime() : undefined,
-    });
-
-    await (channel as TextChannel).send({ embeds: [embed] });
-  } catch (err: unknown) {
-    console.error("[ws] deliver failed", err);
-
-    // Try DM fallback
+    const { embed, row } = watchAlertEmbed(alertData);
+    await (channel as TextChannel).send({ embeds: [embed], components: row ? [row] : [] });
+  } catch (err) {
+    console.error("[ws] channel delivery failed", err);
+    // Fallback: try DM
     try {
-      const user    = await discordClient.users.fetch(entry.discordId);
-      const embed = watchAlertEmbed({
-        inbox:   entry.inbox,
-        from:    String(msg.from ?? ""),
-        subject: String(msg.subject ?? "(no subject)"),
-      });
-      const warning = t(entry.locale, "watch.email_fallback", {
-        channel: `<#${entry.channelId}>`,
-      });
-      await user.send({ content: warning, embeds: [embed] });
-    } catch {
-      // DMs also blocked — give up
-    }
+      const dmUser = await discordClient.users.fetch(entry.discordId);
+      const { embed, row } = watchAlertEmbed(alertData);
+      const warning = t(entry.locale, "watch.email_fallback", { channel: `<#${entry.channelId}>` });
+      await dmUser.send({ content: warning, embeds: [embed], components: row ? [row] : [] });
+    } catch { /* DMs blocked — give up */ }
   }
 }
 
@@ -123,7 +147,6 @@ export function closeConnection(apiKey: string, inbox: string): void {
   connections.delete(key);
 }
 
-// Called on bot startup — reconnects all active DB watches
 export async function initWatchManager(client: Client): Promise<void> {
   discordClient = client;
 
@@ -134,6 +157,7 @@ export async function initWatchManager(client: Client): Promise<void> {
       discordId: w.discordId,
       inbox:     w.inbox,
       channelId: w.channelId,
+      guildId:   w.guildId ?? null,
       apiKey:    w.user.apiKey,
       locale:    w.user.locale ?? "en-US",
     });
@@ -142,18 +166,17 @@ export async function initWatchManager(client: Client): Promise<void> {
   console.log(`[ws] Reconnected ${watches.length} watch(es)`);
 }
 
-// Called by /watch add command
 export async function startWatch(
   discordId: string,
   inbox:     string,
   channelId: string,
+  guildId:   string | null,
   apiKey:    string,
   locale:    string
 ): Promise<void> {
-  await openConnection({ discordId, inbox, channelId, apiKey, locale });
+  await openConnection({ discordId, inbox, channelId, guildId, apiKey, locale });
 }
 
-// Called by /watch remove command
 export async function stopWatch(
   discordId: string,
   inbox:     string,

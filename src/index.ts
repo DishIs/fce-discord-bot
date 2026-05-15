@@ -13,9 +13,9 @@ import {
 } from "discord.js";
 import { prisma, redis, getUser, saveFeedback, markFeedbackSent, getUserApiKey, updateLocale, upsertGuild, markGuildLeft, logCommand } from "./lib/store.js";
 import { FceApi } from "./lib/api.js";
-import { messageEmbed, messagesEmbed } from "./lib/embed.js";
+import { messageEmbed, messagesEmbed, inboxListEmbed } from "./lib/embed.js";
 import { withApiError } from "./lib/upsell.js";
-import { setUserOutputMode, setGuildOutputMode, trackBotMessage, getLastBotMessage } from "./lib/reply-mode.js";
+import { setUserOutputMode, setGuildOutputMode, trackBotMessage, getLastBotMessage, createViewToken } from "./lib/reply-mode.js";
 import { incrementCommandCount } from "./lib/store.js";
 import { maybeSendFeedbackPrompt } from "./handlers/feedback-prompt.js";
 import { startAuthServer } from "./handlers/auth-callback.js";
@@ -204,11 +204,63 @@ async function handleButton(interaction: ButtonInteraction) {
     return;
   }
 
+  // Quick-register an inbox from the error button: quick_register:<inbox>
+  if (customId.startsWith("quick_register:")) {
+    const inbox = customId.slice("quick_register:".length);
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const apiKey = await getUserApiKey(discordId);
+    if (!apiKey) { await interaction.editReply({ content: t(locale, "errors.not_logged_in") }); return; }
+    try {
+      await new FceApi(apiKey).registerInbox(inbox);
+      await interaction.editReply({ content: `✓ **\`${inbox}\`** registered. You can now use it with any bot command.` });
+    } catch {
+      await interaction.editReply({ content: `Could not register \`${inbox}\`. It may already exist or be invalid.` });
+    }
+    return;
+  }
+
+  // Nav shortcuts from error buttons
+  if (customId === "nav_inbox_list") {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const apiKey = await getUserApiKey(discordId);
+    if (!apiKey) { await interaction.editReply({ content: t(locale, "errors.not_logged_in") }); return; }
+    try {
+      const inboxes = await new FceApi(apiKey).listInboxes();
+      const { embed, row } = inboxListEmbed(inboxes);
+      await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
+    } catch { await interaction.editReply({ content: "Could not load inboxes." }); }
+    return;
+  }
+
+  if (customId === "nav_usage") {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const apiKey = await getUserApiKey(discordId);
+    if (!apiKey) { await interaction.editReply({ content: t(locale, "errors.not_logged_in") }); return; }
+    try {
+      const { usageEmbed } = await import("./lib/embed.js");
+      const data = await new FceApi(apiKey).getUsage();
+      const { embed, row } = usageEmbed(data);
+      await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
+    } catch { await interaction.editReply({ content: "Could not load usage." }); }
+    return;
+  }
+
+  if (customId === "trigger_login") {
+    const { loginEmbed } = await import("./lib/embed.js");
+    const { createLoginState } = await import("./lib/store.js");
+    const callbackBase = process.env.CALLBACK_BASE_URL ?? "http://localhost:4242";
+    const fcCliAuthUrl = process.env.FCE_CLI_AUTH_URL  ?? "https://www.freecustom.email/api/bot-auth";
+    const state        = await createLoginState(discordId, interaction.channelId ?? "", interaction.token);
+    const callbackUrl  = `${callbackBase}/auth/callback?state=${state}`;
+    const authUrl      = `${fcCliAuthUrl}?callback=${encodeURIComponent(callbackUrl)}&state=${state}`;
+    const { embed, row } = loginEmbed(authUrl);
+    await interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
+    return;
+  }
+
   // Read a specific message: read_msg:<inbox>:<id>
   if (customId.startsWith("read_msg:")) {
     const parts = customId.split(":");
-    // customId format: read_msg:<inbox>:<msgId>
-    // inbox may contain ":" via none of our addresses do, but split safely
     const inbox = parts[1];
     const msgId = parts[2];
 
@@ -221,11 +273,15 @@ async function handleButton(interaction: ButtonInteraction) {
     }
 
     try {
-      const api = new FceApi(apiKey);
-      const msg = await api.getMessage(inbox, msgId);
-      await interaction.editReply({ embeds: [messageEmbed(msg)] });
+      const callbackBase = process.env.CALLBACK_BASE_URL ?? "http://localhost:4242";
+      const api  = new FceApi(apiKey);
+      const msg  = await api.getMessage(inbox, msgId);
+      const token   = await createViewToken({ inbox, messageId: msgId, apiKey });
+      const viewUrl = `${callbackBase}/view/${token}`;
+      const { embed, row } = messageEmbed(msg, viewUrl);
+      await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
     } catch {
-      await interaction.editReply({ content: "Could not load message. It may have expired." });
+      await interaction.editReply({ content: "Could not load message. It may have been deleted." });
     }
     return;
   }

@@ -215,35 +215,82 @@ export function messagesEmbed(
 
 // ── Single message ────────────────────────────────────────────────────────────
 
-export function messageEmbed(msg: {
-  id:                string;
-  from:              string;
-  subject:           string;
-  date:              string;
-  otp?:              string;
-  verification_link?: string;
-  body_text?:        string;
-}): EmbedBuilder {
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function messageEmbed(
+  msg: {
+    id:                string;
+    from:              string;
+    subject:           string;
+    date:              string;
+    otp?:              string;
+    verification_link?: string;
+    body_text?:        string;
+    body_html?:        string;
+  },
+  viewUrl?: string
+): { embed: EmbedBuilder; row?: ActionRowBuilder<ButtonBuilder> } {
   const e = base()
-    .setTitle("Message")
+    .setTitle(truncate(msg.subject || "(no subject)", 200))
     .addFields(
-      { name: "From",    value: msg.from,           inline: true },
-      { name: "Subject", value: msg.subject,         inline: true },
-      { name: "Date",    value: relativeTime(msg.date), inline: true }
+      { name: "From",    value: truncate(msg.from, 64),    inline: true },
+      { name: "Date",    value: relativeTime(msg.date),    inline: true },
     );
 
-  if (msg.otp && msg.otp !== "__DETECTED__") {
-    e.addFields({ name: "OTP", value: `\`${msg.otp}\``, inline: true });
+  if (msg.otp && msg.otp !== "__DETECTED__" && msg.otp !== "__UPGRADE_REQUIRED__") {
+    e.addFields({ name: "OTP", value: `\`\`\`${msg.otp}\`\`\``, inline: false });
   }
   if (msg.verification_link) {
-    e.addFields({ name: "Verify link", value: `[Click to verify](${msg.verification_link})`, inline: true });
-  }
-  if (msg.body_text) {
-    const body = msg.body_text.replace(/\s+/g, " ").trim().slice(0, 800);
-    e.addFields({ name: "Body", value: `\`\`\`${body}\`\`\`` });
+    e.addFields({ name: "Verify link", value: `[Click to verify](${msg.verification_link})`, inline: false });
   }
 
-  return e;
+  // Body: prefer plain text, fall back to stripped HTML
+  const rawBody = msg.body_text || (msg.body_html ? stripHtml(msg.body_html) : "");
+  if (rawBody) {
+    const body = rawBody.slice(0, 900);
+    const suffix = rawBody.length > 900 ? "\n…(truncated — click Open to read full email)" : "";
+    e.addFields({ name: "Preview", value: body + suffix });
+  } else {
+    e.addFields({ name: "Preview", value: "_No readable content — click Open to view the HTML email._" });
+  }
+
+  if (viewUrl) {
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setLabel("Open email")
+        .setStyle(ButtonStyle.Link)
+        .setURL(viewUrl)
+        .setEmoji("🌐"),
+    );
+    if (msg.verification_link) {
+      row.addComponents(
+        new ButtonBuilder()
+          .setLabel("Verify")
+          .setStyle(ButtonStyle.Link)
+          .setURL(msg.verification_link)
+          .setEmoji("✅"),
+      );
+    }
+    return { embed: e, row };
+  }
+
+  return { embed: e };
 }
 
 // ── OTP ───────────────────────────────────────────────────────────────────────
@@ -328,25 +375,48 @@ export function watchAlertEmbed(data: {
   otp?:              string;
   verification_link?: string;
   timestamp?:        number;
-}): EmbedBuilder {
+  viewUrl?:          string;
+}): { embed: EmbedBuilder; row?: ActionRowBuilder<ButtonBuilder> } {
   const e = base(COLOR_SUCCESS)
     .setTitle("📬 New email")
     .setDescription(`**${data.inbox}**`)
     .addFields(
-      { name: "From",    value: data.from,             inline: true },
-      { name: "Subject", value: truncate(data.subject, 40), inline: true },
+      { name: "From",    value: truncate(data.from, 64),        inline: true },
+      { name: "Subject", value: truncate(data.subject, 64),     inline: true },
     );
 
-  if (data.otp && data.otp !== "__DETECTED__") {
-    e.addFields({ name: "OTP", value: `\`${data.otp}\``, inline: true });
-  }
-  if (data.verification_link) {
-    e.addFields({ name: "Verify link", value: `[Click to verify](${data.verification_link})`, inline: true });
+  if (data.otp && data.otp !== "__DETECTED__" && data.otp !== "__UPGRADE_REQUIRED__") {
+    e.addFields({ name: "OTP", value: `\`\`\`${data.otp}\`\`\``, inline: false });
   }
   if (data.timestamp) {
     e.setTimestamp(data.timestamp);
   }
-  return e;
+
+  const buttons: ButtonBuilder[] = [];
+  if (data.viewUrl) {
+    buttons.push(
+      new ButtonBuilder()
+        .setLabel("Open email")
+        .setStyle(ButtonStyle.Link)
+        .setURL(data.viewUrl)
+        .setEmoji("🌐")
+    );
+  }
+  if (data.verification_link) {
+    buttons.push(
+      new ButtonBuilder()
+        .setLabel("Verify")
+        .setStyle(ButtonStyle.Link)
+        .setURL(data.verification_link)
+        .setEmoji("✅")
+    );
+  }
+
+  const row = buttons.length
+    ? new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)
+    : undefined;
+
+  return { embed: e, row };
 }
 
 // ── Plan gate (upsell) ────────────────────────────────────────────────────────
