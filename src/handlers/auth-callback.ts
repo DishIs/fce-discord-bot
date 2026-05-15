@@ -1,6 +1,6 @@
 import express from "express";
 import { Client, MessageFlags, WebhookClient } from "discord.js";
-import { consumeLoginState } from "../lib/store.js";
+import { consumeLoginState, syncUserPlan } from "../lib/store.js";
 import { FceApi } from "../lib/api.js";
 import { t } from "../i18n/index.js";
 
@@ -27,6 +27,9 @@ export function startAuthServer(client: Client): void {
       }
 
       const { discordId, interactionToken } = result;
+
+      // Sync plan from API immediately after login
+      await syncUserPlan(discordId, api_key).catch(() => {});
 
       // Fetch locale
       const { prisma } = await import("../lib/store.js");

@@ -3,7 +3,7 @@ import {
   SlashCommandBuilder,
   MessageFlags,
 } from "discord.js";
-import { getUser, addWatch, getUserWatches, countActiveWatches } from "../lib/store.js";
+import { getUser, addWatch, getUserWatches, countActiveWatches, syncUserPlan } from "../lib/store.js";
 import { startWatch, stopWatch } from "../handlers/watch-manager.js";
 import { watchListEmbed } from "../lib/embed.js";
 import { requirePlan, withApiError } from "../lib/upsell.js";
@@ -56,8 +56,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const inbox = interaction.options.getString("inbox", true);
 
-  // Startup plan required for WebSocket watch (WS_PLANS = startup, growth, enterprise)
-  const ok = await requirePlan(interaction, user.plan ?? "free", "startup", "Real-time watch", locale);
+  // Sync plan before gate check — DB may be stale
+  const currentPlan = await syncUserPlan(discordId, user.apiKey);
+  const ok = await requirePlan(interaction, currentPlan, "startup", "Real-time watch", locale);
   if (!ok) return;
 
   if (sub === "start") {

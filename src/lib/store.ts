@@ -103,6 +103,23 @@ export async function updateUserPlan(
   });
 }
 
+// Fetch plan from the FCE API and persist it — call before any plan gate
+export async function syncUserPlan(discordId: string, apiKey: string): Promise<string> {
+  try {
+    const { FceApi } = await import("./api.js");
+    const { normalizePlan } = await import("./plan.js");
+    const status = await new FceApi(apiKey).getMe();
+    const plan      = normalizePlan(status.plan);
+    const planLabel = status.plan_label ?? plan;
+    await prisma.user.update({ where: { discordId }, data: { plan, planLabel } });
+    return plan;
+  } catch {
+    // API unreachable — return whatever is already stored
+    const user = await prisma.user.findUnique({ where: { discordId }, select: { plan: true } });
+    return user?.plan ?? "free";
+  }
+}
+
 export async function incrementCommandCount(discordId: string): Promise<number> {
   const user = await prisma.user.update({
     where: { discordId },

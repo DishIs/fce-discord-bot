@@ -3,7 +3,7 @@ import {
   SlashCommandBuilder,
   MessageFlags,
 } from "discord.js";
-import { getUser, addWatch, countActiveWatches } from "../lib/store.js";
+import { getUser, addWatch, countActiveWatches, syncUserPlan } from "../lib/store.js";
 import { FceApi, randomInbox } from "../lib/api.js";
 import { startWatch } from "../handlers/watch-manager.js";
 import { quickstartEmbed } from "../lib/embed.js";
@@ -35,8 +35,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
   const inbox = result.inbox;
 
-  // Set up watch only if plan supports it
-  const canWatch = hasPlan(user.plan ?? "free", "startup");
+  // Sync plan from API before checking (DB may be stale for existing users)
+  const currentPlan = await syncUserPlan(discordId, user.apiKey);
+  const canWatch    = hasPlan(currentPlan, "startup");
   if (canWatch) {
     const count = await countActiveWatches(discordId);
     if (count < 5) {
