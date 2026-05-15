@@ -11,7 +11,7 @@ import {
   TextInputStyle,
   ModalBuilder,
 } from "discord.js";
-import { prisma, redis, getUser, saveFeedback, markFeedbackSent, getUserApiKey, updateLocale } from "./lib/store.js";
+import { prisma, redis, getUser, saveFeedback, markFeedbackSent, getUserApiKey, updateLocale, upsertGuild, markGuildLeft, logCommand } from "./lib/store.js";
 import { FceApi } from "./lib/api.js";
 import { withApiError } from "./lib/upsell.js";
 import { incrementCommandCount } from "./lib/store.js";
@@ -72,17 +72,27 @@ client.on("interactionCreate", async (interaction) => {
     const cmd = commands.get(interaction.commandName);
     if (!cmd) return;
 
+    const t0 = Date.now();
+    let success = true;
     try {
       await cmd.execute(interaction);
     } catch (err) {
+      success = false;
       console.error(`[cmd:${interaction.commandName}]`, err);
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply({ content: "Something went wrong." }).catch(() => {});
       } else {
         await interaction.reply({ content: "Something went wrong.", flags: MessageFlags.Ephemeral }).catch(() => {});
       }
-      return;
+    } finally {
+      const latencyMs = Date.now() - t0;
+      const cmdName = interaction.commandName;
+      const guildId = interaction.guildId ?? null;
+      // Fire-and-forget — never blocks the response
+      setImmediate(() => logCommand(interaction.user.id, cmdName, latencyMs, guildId, success));
     }
+
+    if (!success) return;
 
     // Post-command: increment count + maybe prompt feedback
     const discordId = interaction.user.id;
@@ -254,6 +264,16 @@ async function handleModal(interaction: ModalSubmitInteraction) {
     return;
   }
 }
+
+// ── Guild lifecycle ───────────────────────────────────────────────────────────
+
+client.on("guildCreate", (guild) => {
+  upsertGuild(guild.id, guild.name, guild.memberCount).catch(() => {});
+});
+
+client.on("guildDelete", (guild) => {
+  markGuildLeft(guild.id).catch(() => {});
+});
 
 // ── Bot ready ─────────────────────────────────────────────────────────────────
 

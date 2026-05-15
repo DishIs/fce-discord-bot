@@ -203,3 +203,68 @@ export async function getAllFeedback() {
     take:    500,
   });
 }
+
+// ── Guild tracking ────────────────────────────────────────────────────────────
+
+export async function upsertGuild(guildId: string, name: string, memberCount: number): Promise<void> {
+  await prisma.guild.upsert({
+    where:  { guildId },
+    create: { guildId, name, memberCount, active: true },
+    update: { name, memberCount, active: true, leftAt: null },
+  });
+}
+
+export async function markGuildLeft(guildId: string): Promise<void> {
+  await prisma.guild.update({
+    where: { guildId },
+    data:  { active: false, leftAt: new Date() },
+  }).catch(() => {});
+}
+
+// ── Command latency (fire-and-forget) ─────────────────────────────────────────
+
+export function logCommand(
+  discordId: string,
+  command:   string,
+  latencyMs: number,
+  guildId:   string | null,
+  success:   boolean
+): void {
+  // Non-blocking — never awaited by callers
+  prisma.commandLog.create({
+    data: { discordId, command, latencyMs, guildId, success },
+  }).catch(() => {});
+}
+
+export async function getAdminStats() {
+  const [guilds, totalCommands, avgLatency, recentErrors] = await Promise.all([
+    prisma.guild.findMany({ orderBy: { memberCount: "desc" } }),
+    prisma.commandLog.count(),
+    prisma.commandLog.aggregate({ _avg: { latencyMs: true } }),
+    prisma.commandLog.count({ where: { success: false, createdAt: { gte: new Date(Date.now() - 86400000) } } }),
+  ]);
+
+  // Per-guild stats
+  const guildStats = await Promise.all(
+    guilds.map(async (g) => {
+      const stats = await prisma.commandLog.aggregate({
+        where: { guildId: g.guildId },
+        _avg:  { latencyMs: true },
+        _count: { id: true },
+      });
+      return {
+        ...g,
+        avgLatencyMs: Math.round(stats._avg.latencyMs ?? 0),
+        commandCount: stats._count.id,
+      };
+    })
+  );
+
+  return {
+    totalGuilds:    guilds.filter(g => g.active).length,
+    totalCommands,
+    avgLatencyMs:   Math.round(avgLatency._avg.latencyMs ?? 0),
+    recentErrors,
+    guilds:         guildStats,
+  };
+}

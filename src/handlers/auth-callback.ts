@@ -108,6 +108,21 @@ export function startAuthServer(client: Client): void {
     }
   });
 
+  app.get("/admin/stats", async (req, res) => {
+    const pw = req.headers["x-admin-password"] as string | undefined;
+    if (!pw || pw !== process.env.ADMIN_PASSWORD) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    try {
+      const { getAdminStats } = await import("../lib/store.js");
+      res.json(await getAdminStats());
+    } catch (err) {
+      console.error("[admin/stats]", err);
+      res.status(500).json({ error: "Internal error" });
+    }
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`[auth] Callback server listening on :${PORT}`);
   });

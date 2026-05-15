@@ -59,3 +59,26 @@ model LoginState {
 
   @@index([discordId])
 }
+
+model Guild {
+  guildId     String    @id
+  name        String
+  memberCount Int       @default(0)
+  joinedAt    DateTime  @default(now())
+  leftAt      DateTime?
+  active      Boolean   @default(true)
+  updatedAt   DateTime  @updatedAt
+}
+
+model CommandLog {
+  id        String   @id @default(cuid())
+  guildId   String?
+  discordId String
+  command   String
+  latencyMs Int
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
+  @@index([createdAt])
+}
