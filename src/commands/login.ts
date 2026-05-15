@@ -25,7 +25,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return;
   }
 
-  const state      = await createLoginState(discordId, interaction.channelId);
+  const state      = await createLoginState(discordId, interaction.channelId, interaction.token);
   const authBase   = process.env.FCE_CLI_AUTH_URL ?? "https://www.freecustom.email/api/cli-auth";
   const callbackBase = process.env.CALLBACK_BASE_URL ?? "https://bot.freecustom.email";
   // state is embedded inside the callback URL so the auth page forwards it automatically

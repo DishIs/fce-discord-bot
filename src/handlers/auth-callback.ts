@@ -1,5 +1,5 @@
 import express from "express";
-import { Client, MessageFlags } from "discord.js";
+import { Client, MessageFlags, WebhookClient } from "discord.js";
 import { consumeLoginState } from "../lib/store.js";
 import { FceApi } from "../lib/api.js";
 import { t } from "../i18n/index.js";
@@ -26,7 +26,7 @@ export function startAuthServer(client: Client): void {
         return;
       }
 
-      const { discordId, channelId } = result;
+      const { discordId, interactionToken } = result;
 
       // Fetch locale
       const { prisma } = await import("../lib/store.js");
@@ -38,25 +38,31 @@ export function startAuthServer(client: Client): void {
 
       const successMsg = `${t(locale, "login.success")}\n${t(locale, "login.success_hint")}`;
 
-      // 1. Post to the channel where /login was run (most reliable)
-      if (channelId) {
+      // Edit the original ephemeral /login reply — stays private, replaces the login button
+      if (interactionToken && client.application?.id) {
         try {
-          const { TextChannel } = await import("discord.js");
-          const ch = await client.channels.fetch(channelId);
-          if (ch instanceof TextChannel) {
-            await ch.send(`<@${discordId}> ${successMsg}`);
-          }
+          const webhook = new WebhookClient({
+            id:    client.application.id,
+            token: interactionToken,
+          });
+          await webhook.editMessage("@original", {
+            content:    successMsg,
+            embeds:     [],
+            components: [],
+          });
         } catch {
-          // Channel unavailable — fall through to DM
+          // Token expired (>15 min) — fall back to DM
+          try {
+            const dmUser = await client.users.fetch(discordId);
+            await dmUser.send(successMsg);
+          } catch { /* DMs disabled */ }
         }
-      }
-
-      // 2. DM as fallback (works if user has DMs enabled)
-      try {
-        const dmUser = await client.users.fetch(discordId);
-        await dmUser.send(successMsg);
-      } catch {
-        // DMs disabled — silently ignore
+      } else {
+        // Postgres fallback path — no token, try DM
+        try {
+          const dmUser = await client.users.fetch(discordId);
+          await dmUser.send(successMsg);
+        } catch { /* DMs disabled */ }
       }
 
       res.status(200).send(`
