@@ -29,7 +29,7 @@ export const PLAN_FEATURES: Record<PlanName, string[]> = {
   developer:  ["10 req/sec", "50,000 req/month", "25 inboxes", "Dedicated pool", "Wait API", "OTP extraction"],
   startup:    ["25 req/sec", "250,000 req/month", "40 inboxes", "Dedicated pool", "WebSocket watch", "OTP extraction", "Attachments up to 5 MB"],
   growth:     ["50 req/sec", "1,000,000 req/month", "100 inboxes", "Dedicated pool", "WebSocket watch", "OTP extraction", "Attachments up to 25 MB", "Custom domains", "MCP access", "Webhooks", "Timeline & insights"],
-  enterprise: ["100 req/sec", "10,000,000 req/month", "Unlimited inboxes", "Dedicated pool", "Everything in Growth", "99.5% SLA", "Dedicated support"],
+  enterprise: ["100 req/sec", "10,000,000 req/month", "Unlimited inboxes", "Dedicated pool", "Everything in Growth", "99.95% SLA", "Dedicated support"],
 };
 
 export function planLevel(plan: string): number {

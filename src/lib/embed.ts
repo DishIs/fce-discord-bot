@@ -345,7 +345,7 @@ export function plansEmbed(currentPlan: string): {
       { name: "Developer · $10/mo",  value: "50k req/mo · 25 inboxes · Wait API",                                 inline: false },
       { name: "Startup · $29/mo",    value: "250k req/mo · 40 inboxes · WebSocket watch (5 conns)",               inline: false },
       { name: "Growth · $89/mo ⭐",  value: "1M req/mo · 100 inboxes · OTP · WebSocket (20 conns) · Custom domains · MCP", inline: false },
-      { name: "Enterprise · $199/mo", value: "10M req/mo · Unlimited · WebSocket (100 conns) · 99.5% SLA",       inline: false },
+      { name: "Enterprise · $199/mo", value: "10M req/mo · Unlimited · WebSocket (100 conns) · 99.95% SLA",      inline: false },
     );
 
   const plans = ["developer", "startup", "growth", "enterprise"];
