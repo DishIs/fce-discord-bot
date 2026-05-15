@@ -56,7 +56,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   if (sub === "list") {
     const inboxes = await withApiError(interaction, locale, () => api.listInboxes());
     if (!inboxes) return;
-    await interaction.editReply({ embeds: [inboxListEmbed(inboxes)] });
+    const { embed, row } = inboxListEmbed(inboxes);
+    await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
     return;
   }
 

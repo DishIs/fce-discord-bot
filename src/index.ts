@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { prisma, redis, getUser, saveFeedback, markFeedbackSent, getUserApiKey, updateLocale, upsertGuild, markGuildLeft, logCommand } from "./lib/store.js";
 import { FceApi } from "./lib/api.js";
+import { messageEmbed, messagesEmbed } from "./lib/embed.js";
 import { withApiError } from "./lib/upsell.js";
 import { incrementCommandCount } from "./lib/store.js";
 import { maybeSendFeedbackPrompt } from "./handlers/feedback-prompt.js";
@@ -157,6 +158,55 @@ async function handleButton(interaction: ButtonInteraction) {
 
   if (customId === "inbox_remove_cancel") {
     await interaction.update({ content: t(locale, "inbox.cancelled"), components: [] });
+    return;
+  }
+
+  // Read a specific message: read_msg:<inbox>:<id>
+  if (customId.startsWith("read_msg:")) {
+    const parts = customId.split(":");
+    // customId format: read_msg:<inbox>:<msgId>
+    // inbox may contain ":" via none of our addresses do, but split safely
+    const inbox = parts[1];
+    const msgId = parts[2];
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const apiKey = await getUserApiKey(discordId);
+    if (!apiKey) {
+      await interaction.editReply({ content: t(locale, "errors.not_logged_in") });
+      return;
+    }
+
+    try {
+      const api = new FceApi(apiKey);
+      const msg = await api.getMessage(inbox, msgId);
+      await interaction.editReply({ embeds: [messageEmbed(msg)] });
+    } catch {
+      await interaction.editReply({ content: "Could not load message. It may have expired." });
+    }
+    return;
+  }
+
+  // Check messages for an inbox: inbox_msgs:<inbox>
+  if (customId.startsWith("inbox_msgs:")) {
+    const inbox = customId.slice("inbox_msgs:".length);
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const apiKey = await getUserApiKey(discordId);
+    if (!apiKey) {
+      await interaction.editReply({ content: t(locale, "errors.not_logged_in") });
+      return;
+    }
+
+    try {
+      const api            = new FceApi(apiKey);
+      const msgs           = await api.listMessages(inbox);
+      const { embed, row } = messagesEmbed(inbox, msgs);
+      await interaction.editReply({ embeds: [embed], components: row ? [row] : [] });
+    } catch {
+      await interaction.editReply({ content: "Could not load messages. Try again." });
+    }
     return;
   }
 

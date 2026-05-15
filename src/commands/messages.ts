@@ -33,5 +33,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const messages = await withApiError(interaction, locale, () => api.listMessages(inbox));
   if (!messages) return;
 
-  await interaction.editReply({ embeds: [messagesEmbed(inbox, messages)] });
+  const { embed, row } = messagesEmbed(inbox, messages);
+  await interaction.editReply({
+    embeds:     [embed],
+    components: row ? [row] : [],
+  });
 }

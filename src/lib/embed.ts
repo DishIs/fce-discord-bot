@@ -138,15 +138,34 @@ function progressBar(used: number, limit: number, width = 20): string {
 
 // ── Inboxes ───────────────────────────────────────────────────────────────────
 
-export function inboxListEmbed(inboxes: Array<{ inbox: string }>): EmbedBuilder {
+export function inboxListEmbed(inboxes: Array<{ inbox: string }>): {
+  embed: EmbedBuilder;
+  row?:  ActionRowBuilder<ButtonBuilder>;
+} {
   if (inboxes.length === 0) {
-    return base()
-      .setTitle("Your Inboxes")
-      .setDescription("No inboxes registered yet.\nUse `/inbox add` or `/quickstart` to create one.");
+    return {
+      embed: base()
+        .setTitle("Your Inboxes")
+        .setDescription("No inboxes registered yet.\nUse `/inbox add` or `/quickstart` to create one."),
+    };
   }
-  return base()
+
+  const visible = inboxes.slice(0, 5);
+  const embed   = base()
     .setTitle(`Your Inboxes (${inboxes.length})`)
     .setDescription(inboxes.map((i) => `\`${i.inbox}\``).join("\n"));
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    ...visible.map((i) =>
+      new ButtonBuilder()
+        .setCustomId(`inbox_msgs:${i.inbox}`)
+        .setLabel(truncate(i.inbox.split("@")[0], 20))
+        .setEmoji("📬")
+        .setStyle(ButtonStyle.Secondary)
+    )
+  );
+
+  return { embed, row };
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -160,22 +179,38 @@ export function messagesEmbed(
     date:    string;
     otp?:    string;
   }>
-): EmbedBuilder {
+): { embed: EmbedBuilder; row?: ActionRowBuilder<ButtonBuilder> } {
   if (messages.length === 0) {
-    return base()
-      .setTitle(`Messages in ${inbox}`)
-      .setDescription("No messages yet.\nEmails sent to this address will appear here.");
+    return {
+      embed: base()
+        .setTitle(`Messages in ${inbox}`)
+        .setDescription("No messages yet.\nEmails sent to this address will appear here."),
+    };
   }
 
-  const lines = messages.slice(0, 5).map((m) => {
-    const otp  = m.otp && m.otp !== "__DETECTED__" ? `  \`OTP: ${m.otp}\`` : "";
-    return `**\`${m.id.slice(0, 8)}\`**  ${truncate(m.from, 28)}\n└ ${truncate(m.subject, 40)}${otp}  · ${relativeTime(m.date)}`;
+  const visible = messages.slice(0, 5);
+  const NUMS    = ["①", "②", "③", "④", "⑤"];
+
+  const lines = visible.map((m, i) => {
+    const otp = m.otp && m.otp !== "__DETECTED__" ? `  \`OTP: ${m.otp}\`` : "";
+    return `${NUMS[i]} **${truncate(m.subject, 42)}**${otp}\n   ${truncate(m.from, 36)}  ·  ${relativeTime(m.date)}`;
   });
 
-  return base()
-    .setTitle(`Messages in ${inbox}`)
+  const embed = base()
+    .setTitle(`📭 ${inbox}`)
     .setDescription(lines.join("\n\n"))
-    .setFooter({ text: `Use /read ${inbox} <id> to open · ${FOOTER_TEXT}` });
+    .setFooter({ text: FOOTER_TEXT });
+
+  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    ...visible.map((m, i) =>
+      new ButtonBuilder()
+        .setCustomId(`read_msg:${inbox}:${m.id}`)
+        .setLabel(`${NUMS[i]} Read`)
+        .setStyle(ButtonStyle.Secondary)
+    )
+  );
+
+  return { embed, row };
 }
 
 // ── Single message ────────────────────────────────────────────────────────────
