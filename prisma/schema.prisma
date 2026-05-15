@@ -52,6 +52,7 @@ model Feedback {
 model LoginState {
   state     String   @id
   discordId String
+  channelId String?
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())

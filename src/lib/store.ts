@@ -16,14 +16,18 @@ const LOGIN_TTL = parseInt(process.env.LOGIN_STATE_TTL ?? "180", 10);
 
 // ── Login state ────────────────────────────────────────────────────────────────
 
-export async function createLoginState(discordId: string): Promise<string> {
+export interface LoginResult {
+  discordId: string;
+  channelId: string | null;
+}
+
+export async function createLoginState(discordId: string, channelId: string): Promise<string> {
   const state     = randomUUID();
   const expiresAt = new Date(Date.now() + LOGIN_TTL * 1000);
 
-  // Store in both Redis (fast expiry) and Postgres (reliable)
   await Promise.all([
-    redis.setex(`login:${state}`, LOGIN_TTL, discordId),
-    prisma.loginState.create({ data: { state, discordId, expiresAt } }),
+    redis.setex(`login:${state}`, LOGIN_TTL, JSON.stringify({ discordId, channelId })),
+    prisma.loginState.create({ data: { state, discordId, channelId, expiresAt } }),
   ]);
 
   return state;
@@ -33,24 +37,21 @@ export async function consumeLoginState(
   state: string,
   apiKey: string,
   username: string
-): Promise<string | null> {
-  const discordId = await redis.get(`login:${state}`);
-  if (!discordId) {
-    // Fallback: check Postgres (Redis might have evicted)
+): Promise<LoginResult | null> {
+  const raw = await redis.get(`login:${state}`);
+  if (!raw) {
     const row = await prisma.loginState.findUnique({ where: { state } });
     if (!row || row.used || row.expiresAt < new Date()) return null;
     await prisma.loginState.update({ where: { state }, data: { used: true } });
     await upsertUser(row.discordId, username, apiKey);
-    return row.discordId;
+    return { discordId: row.discordId, channelId: row.channelId ?? null };
   }
 
+  const { discordId, channelId } = JSON.parse(raw) as { discordId: string; channelId: string };
   await redis.del(`login:${state}`);
-  await prisma.loginState.updateMany({
-    where: { state },
-    data:  { used: true },
-  });
+  await prisma.loginState.updateMany({ where: { state }, data: { used: true } });
   await upsertUser(discordId, username, apiKey);
-  return discordId;
+  return { discordId, channelId: channelId ?? null };
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────

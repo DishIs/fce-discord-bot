@@ -19,14 +19,16 @@ export function startAuthServer(client: Client): void {
     }
 
     try {
-      const discordId = await consumeLoginState(state, api_key, username ?? "");
+      const result = await consumeLoginState(state, api_key, username ?? "");
 
-      if (!discordId) {
+      if (!result) {
         res.status(410).send("Login link expired or already used.");
         return;
       }
 
-      // Fetch the user's locale from DB for the DM (fall back to en-US)
+      const { discordId, channelId } = result;
+
+      // Fetch locale
       const { prisma } = await import("../lib/store.js");
       const user  = await prisma.user.findUnique({
         where:  { discordId },
@@ -34,12 +36,25 @@ export function startAuthServer(client: Client): void {
       });
       const locale = user?.locale ?? "en-US";
 
-      // Notify via DM
+      const successMsg = `${t(locale, "login.success")}\n${t(locale, "login.success_hint")}`;
+
+      // 1. Post to the channel where /login was run (most reliable)
+      if (channelId) {
+        try {
+          const { TextChannel } = await import("discord.js");
+          const ch = await client.channels.fetch(channelId);
+          if (ch instanceof TextChannel) {
+            await ch.send(`<@${discordId}> ${successMsg}`);
+          }
+        } catch {
+          // Channel unavailable — fall through to DM
+        }
+      }
+
+      // 2. DM as fallback (works if user has DMs enabled)
       try {
         const dmUser = await client.users.fetch(discordId);
-        await dmUser.send(
-          `${t(locale, "login.success")}\n${t(locale, "login.success_hint")}`
-        );
+        await dmUser.send(successMsg);
       } catch {
         // DMs disabled — silently ignore
       }
