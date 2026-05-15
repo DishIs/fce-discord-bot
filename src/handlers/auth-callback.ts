@@ -137,7 +137,7 @@ export function startAuthServer(client: Client): void {
       }
 
       const apiBase = process.env.FCE_API_BASE ?? "https://api2.freecustom.email/v1";
-      const apiRes  = await fetch(`${apiBase}/inboxes/${encodeURIComponent(data.inbox)}/messages/${encodeURIComponent(data.messageId)}`, {
+      const apiRes  = await fetch(`${apiBase}/inboxes/${data.inbox}/messages/${data.messageId}`, {
         headers: { Authorization: `Bearer ${data.apiKey}`, "User-Agent": "fce-discord-bot/1.0.0" },
       });
 
