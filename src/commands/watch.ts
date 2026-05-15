@@ -8,6 +8,7 @@ import { startWatch, stopWatch } from "../handlers/watch-manager.js";
 import { watchListEmbed } from "../lib/embed.js";
 import { requirePlan, withApiError } from "../lib/upsell.js";
 import { t } from "../i18n/index.js";
+import { isOutputEphemeral } from "../lib/reply-mode.js";
 
 const MAX_WATCHES = 5;
 
@@ -35,10 +36,11 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
   const locale    = interaction.locale;
   const discordId = interaction.user.id;
+  const ephemeral = await isOutputEphemeral(discordId, interaction.guildId);
+  await interaction.deferReply(ephemeral ? { flags: MessageFlags.Ephemeral } : {});
+
   const user      = await getUser(discordId);
 
   if (!user?.apiKey) {

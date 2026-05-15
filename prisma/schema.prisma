@@ -17,6 +17,7 @@ model User {
   commandCount Int      @default(0)
   feedbackSent Boolean  @default(false)
   jsonMode     Boolean  @default(false)
+  publicOutput Boolean  @default(false)
   locale       String   @default("en-US")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -66,8 +67,9 @@ model Guild {
   memberCount Int       @default(0)
   joinedAt    DateTime  @default(now())
   leftAt      DateTime?
-  active      Boolean   @default(true)
-  updatedAt   DateTime  @updatedAt
+  active        Boolean   @default(true)
+  publicOutput  Boolean   @default(false)
+  updatedAt     DateTime  @updatedAt
 }
 
 model CommandLog {

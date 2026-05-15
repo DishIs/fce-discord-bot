@@ -15,6 +15,7 @@ import { prisma, redis, getUser, saveFeedback, markFeedbackSent, getUserApiKey, 
 import { FceApi } from "./lib/api.js";
 import { messageEmbed, messagesEmbed } from "./lib/embed.js";
 import { withApiError } from "./lib/upsell.js";
+import { setUserOutputMode, setGuildOutputMode, trackBotMessage, getLastBotMessage } from "./lib/reply-mode.js";
 import { incrementCommandCount } from "./lib/store.js";
 import { maybeSendFeedbackPrompt } from "./handlers/feedback-prompt.js";
 import { startAuthServer } from "./handlers/auth-callback.js";
@@ -44,6 +45,8 @@ import * as ping      from "./commands/ping.js";
 import * as me        from "./commands/me.js";
 import * as feedback  from "./commands/feedback.js";
 import * as format    from "./commands/format.js";
+import * as settings  from "./commands/settings.js";
+import * as pin       from "./commands/pin.js";
 
 type CommandModule = {
   data: { name: string };
@@ -54,6 +57,7 @@ const commandModules: CommandModule[] = [
   login, logout, status, usage, inbox, messages, read, otp,
   domains, watch, plans, quickstart, timeline, insights,
   help, guide, support, ping, me, feedback, format,
+  settings, pin,
 ];
 
 const commands = new Collection<string, CommandModule>();
@@ -94,6 +98,18 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     if (!success) return;
+
+    // Track last bot message per channel for /pin (fire-and-forget)
+    if (interaction.channelId) {
+      setImmediate(async () => {
+        try {
+          const reply = await interaction.fetchReply();
+          if (!reply.flags.has(MessageFlags.Ephemeral)) {
+            trackBotMessage(interaction.channelId!, reply.id);
+          }
+        } catch {}
+      });
+    }
 
     // Post-command: increment count + maybe prompt feedback
     const discordId = interaction.user.id;
@@ -158,6 +174,33 @@ async function handleButton(interaction: ButtonInteraction) {
 
   if (customId === "inbox_remove_cancel") {
     await interaction.update({ content: t(locale, "inbox.cancelled"), components: [] });
+    return;
+  }
+
+  // Settings output toggle: settings_output:<scope>:<value>  scope=user|guild, value=0|1
+  if (customId.startsWith("settings_output:")) {
+    const parts   = customId.split(":");
+    const scope   = parts[1] as "user" | "guild";
+    const isPublic = parts[2] === "1";
+    const guildId  = interaction.guildId;
+
+    if (scope === "guild" && guildId) {
+      await setGuildOutputMode(guildId, isPublic);
+      await interaction.update({
+        content: isPublic
+          ? "✓ Server output mode set to **Public** — bot replies will appear as regular messages."
+          : "✓ Server output mode set to **Private** — bot replies will be dismissible.",
+        embeds: [], components: [],
+      });
+    } else {
+      await setUserOutputMode(discordId, isPublic);
+      await interaction.update({
+        content: isPublic
+          ? "✓ Your output mode set to **Public** — bot replies will appear as regular DM messages."
+          : "✓ Your output mode set to **Private** — bot replies will be dismissible.",
+        embeds: [], components: [],
+      });
+    }
     return;
   }
 

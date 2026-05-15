@@ -8,13 +8,16 @@ import {
   MessageFlags,
 } from "discord.js";
 import { t } from "../i18n/index.js";
+import { isOutputEphemeral } from "../lib/reply-mode.js";
 
 export const data = new SlashCommandBuilder()
   .setName("guide")
   .setDescription("Step-by-step onboarding guide");
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  const locale = interaction.locale;
+  const locale    = interaction.locale;
+  const discordId = interaction.user.id;
+  const ephemeral = await isOutputEphemeral(discordId, interaction.guildId);
 
   const embed = new EmbedBuilder()
     .setColor(0x1a1a1a)
@@ -28,5 +31,5 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     )
     .setFooter({ text: "freecustom.email · Run /help to see all commands" });
 
-  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+  await interaction.reply({ embeds: [embed], ...(ephemeral ? { flags: MessageFlags.Ephemeral } : {}) });
 }

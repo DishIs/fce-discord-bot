@@ -20,6 +20,8 @@ import * as ping      from "./commands/ping.js";
 import * as me        from "./commands/me.js";
 import * as feedback  from "./commands/feedback.js";
 import * as format    from "./commands/format.js";
+import * as settings  from "./commands/settings.js";
+import * as pin       from "./commands/pin.js";
 
 const token     = process.env.DISCORD_TOKEN!;
 const clientId  = process.env.DISCORD_CLIENT_ID!;
@@ -28,6 +30,7 @@ const commands = [
   login, logout, status, usage, inbox, messages, read, otp,
   domains, watch, plans, quickstart, timeline, insights,
   help, guide, support, ping, me, feedback, format,
+  settings, pin,
 ].map((m) => m.data.toJSON());
 
 const rest = new REST().setToken(token);
