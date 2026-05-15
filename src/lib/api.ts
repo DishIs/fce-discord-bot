@@ -105,22 +105,32 @@ export class FceApi {
   getRawMe()                               { return this.req<Record<string, unknown>>("GET", "/me"); }
 }
 
-// Random inbox generator — mirrors fce-cli exactly
-const DOMAINS  = ["ditube.info", "junkstopper.info", "ditapi.info", "ditgame.info", "ditplay.info", "ditcloud.info"];
-const ADJS     = ["swift","clear","quiet","bright","calm","sharp","bold","cool","crisp","light"];
-const NOUNS    = ["fox","hawk","mint","wave","peak","pine","vale","reef","beam","dusk"];
+// Random inbox generator
+const FALLBACK_DOMAINS = ["ditube.info", "junkstopper.info", "ditapi.info", "ditgame.info", "ditplay.info", "ditcloud.info"];
+const ADJS  = ["swift","clear","quiet","bright","calm","sharp","bold","cool","crisp","light"];
+const NOUNS = ["fox","hawk","mint","wave","peak","pine","vale","reef","beam","dusk"];
 
+function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function buildAddress(domain: string): string {
+  return `${pick(ADJS)}${pick(NOUNS)}${Math.floor(Math.random() * 9000) + 1000}@${domain}`;
+}
+
+// Uses the live domain list returned by api.listDomains() — already plan-filtered by the
+// API, so pro/fresh/custom domains are included automatically for eligible users.
+// Falls back to the hardcoded list when domains is empty or the call failed.
+export function randomInboxFrom(domains: ApiDomain[]): string {
+  const pool = domains.map((d) => d.domain).filter(Boolean);
+  return buildAddress(pool.length ? pick(pool) : pick(FALLBACK_DOMAINS));
+}
+
+// Fallback used when we can't reach the API before registering.
 export function randomInbox(): string {
-  const adj    = ADJS[Math.floor(Math.random() * ADJS.length)];
-  const noun   = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const n      = Math.floor(Math.random() * 9000) + 1000;
-  const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)];
-  return `${adj}${noun}${n}@${domain}`;
+  return buildAddress(pick(FALLBACK_DOMAINS));
 }
 
 export function devInbox(): string {
   const chars  = "abcdefghijklmnopqrstuvwxyz0123456789";
   const suffix = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)];
-  return `dev-${suffix}@${domain}`;
+  return `dev-${suffix}@${pick(FALLBACK_DOMAINS)}`;
 }

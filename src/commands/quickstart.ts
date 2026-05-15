@@ -4,7 +4,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { getUser, addWatch, countActiveWatches, syncUserPlan } from "../lib/store.js";
-import { FceApi, randomInbox } from "../lib/api.js";
+import { FceApi, randomInbox, randomInboxFrom } from "../lib/api.js";
 import { startWatch } from "../handlers/watch-manager.js";
 import { quickstartEmbed } from "../lib/embed.js";
 import { hasPlan } from "../lib/plan.js";
@@ -28,7 +28,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   }
 
   const api     = new FceApi(user.apiKey);
-  const address = randomInbox();
+
+  // Fetch available domains for this user's plan (includes pro/custom for eligible plans).
+  // Fail silently — fall back to hardcoded pool so quickstart never blocks on this.
+  const domains  = await api.listDomains().catch(() => []);
+  const address  = domains.length ? randomInboxFrom(domains) : randomInbox();
 
   const result = await withApiError(interaction, locale, () => api.registerInbox(address));
   if (!result) return;
