@@ -147,10 +147,18 @@ export function startAuthServer(client: Client): void {
       }
 
       const json = await apiRes.json() as Record<string, unknown>;
-      const msg  = (json.data ?? json) as {
-        from?: string; subject?: string; date?: string;
-        body_html?: string; body_text?: string;
-        otp?: string; verification_link?: string;
+      // Unwrap { data: {...} } envelope if present
+      const raw  = (typeof json.data === "object" && json.data !== null ? json.data : json) as Record<string, unknown>;
+
+      // Normalise field names — API versions may differ
+      const msg = {
+        from:              String(raw.from             ?? ""),
+        subject:           String(raw.subject          ?? "(no subject)"),
+        date:              String(raw.date             ?? raw.received_at ?? ""),
+        body_html:         String(raw.body_html        ?? raw.html        ?? raw.body?.toString() ?? ""),
+        body_text:         String(raw.body_text        ?? raw.text        ?? raw.plain_text       ?? ""),
+        otp:               raw.otp               ? String(raw.otp)               : undefined,
+        verification_link: raw.verification_link ? String(raw.verification_link) : undefined,
       };
 
       res.status(200).send(renderEmailPage(msg));
@@ -189,8 +197,8 @@ function renderEmailPage(msg: {
     :root { color-scheme: light dark; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d0d0d; color: #e5e5e5; min-height: 100vh; padding: 0; }
     .header { background: #111; border-bottom: 1px solid #222; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
-    .logo { font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -0.3px; }
-    .logo span { color: #22c55e; }
+    .logo { font-weight: 700; font-size: 14px; color: #fff; letter-spacing: -0.3px; text-decoration: none; }
+    .logo:hover { opacity: 0.85; }
     .meta { max-width: 760px; margin: 24px auto; padding: 0 24px; }
     .meta-card { background: #141414; border: 1px solid #222; border-radius: 10px; padding: 20px 24px; }
     .subject { font-size: 20px; font-weight: 600; line-height: 1.3; margin-bottom: 16px; }
@@ -210,7 +218,7 @@ function renderEmailPage(msg: {
 </head>
 <body>
   <div class="header">
-    <div class="logo">Free<span>Custom</span>.Email</div>
+    <a href="https://www.freecustom.email" class="logo">FreeCustom.Email Bot</a>
   </div>
 
   <div class="meta">
@@ -225,12 +233,13 @@ function renderEmailPage(msg: {
 
   <div class="body-wrap">
     ${bodyHtml
-      ? `<div class="body-card"><iframe srcdoc="${esc(bodyHtml)}" sandbox="allow-same-origin" onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe></div>`
+      ? `<div class="body-card"><iframe src="data:text/html;base64,${Buffer.from(bodyHtml).toString("base64")}" sandbox="allow-same-origin" onload="this.style.height=this.contentWindow.document.body.scrollHeight+'px'"></iframe></div>`
       : bodyText
         ? `<div class="body-plain">${esc(bodyText)}</div>`
         : `<div class="body-plain" style="color:#666;font-style:italic">No message body.</div>`
     }
   </div>
+  <div style="text-align:center;padding:24px;font-size:12px;color:#555"><a href="https://www.freecustom.email/api/discord" style="color:#555;text-decoration:none">get the bot for your server</a></div>
 </body>
 </html>`;
 }
